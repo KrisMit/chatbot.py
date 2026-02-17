@@ -1,17 +1,17 @@
-# Chatbot.py
+# Python AI Chatbot Utility
 
-A simple Python-based chatbot I built to experiment with conversation logic, prompts, and testing. This is a minimal CLI version, easy to tweak or expand with AI tools later.
+A functional Python-based conversational interface designed to demonstrate clean coding practices and LLM integration. This project serves as a practical example of managing user-driven data flows and API communication.
 
-## Features
+## Tech Stack & Tools
+* **Language:** Python 3.x
+* **Development Environment:** PyCharm
 
-- Responds to user input with basic logic
-- Modular structure for adding prompts or rules
-- A base for exploring prompt engineering or integrating APIs
+## Key Features
+* **Interactive CLI:** A user-friendly command-line interface for real-time interaction.
+* **Context Management:** Logic to handle conversation history, ensuring the AI maintains thread relevance.
+* **Modular Codebase:** Organized for readability, making it easy to swap different LLM backends.
 
 ## How to Run
-
-1. Clone the repo:
-
-```bash
-git clone https://github.com/KrisMit/chatbot.py
-cd chatbot.py
+1. Clone the repository.
+2. Ensure you have your API Key configured in your environment variables.
+3. Run `python chatbot.py` from your terminal or PyCharm.
