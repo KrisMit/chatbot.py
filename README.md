@@ -1,17 +1,23 @@
-# Python AI Chatbot Utility
+# PDF Insight AI (RAG Chatbot)
 
-A functional Python-based conversational interface designed to demonstrate clean coding practices and LLM integration. This project serves as a practical example of managing user-driven data flows and API communication.
+An intelligent Retrieval-Augmented Generation (RAG) application that allows users to upload PDF documents and ask questions about their content. This project demonstrates my ability to build end-to-end AI workflows using Python and modern LLM frameworks.
 
 ## Tech Stack & Tools
-* **Language:** Python 3.x
-* **Development Environment:** PyCharm
+* **Framework:** Streamlit (UI/Frontend)
+* **Orchestration:** LangChain
+* **LLM:** OpenAI GPT-3.5 Turbo
+* **Vector Database:** FAISS (Facebook AI Similarity Search)
+* **Embeddings:** OpenAI Embeddings
+* **IDE:** PyCharm Professional
 
 ## Key Features
-* **Interactive CLI:** A user-friendly command-line interface for real-time interaction.
-* **Context Management:** Logic to handle conversation history, ensuring the AI maintains thread relevance.
-* **Modular Codebase:** Organized for readability, making it easy to swap different LLM backends.
+* **Document Ingestion:** Uses `PyPDF2` to extract and process text from user-uploaded PDFs.
+* **Text Chunking:** Implements `RecursiveCharacterTextSplitter` for optimized context window management.
+* **Vector Search:** Performs semantic similarity searches to find the most relevant document sections for a user's query.
+* **Smart Q&A:** Uses LangChain's `load_qa_chain` to provide accurate, context-aware answers.
 
 ## How to Run
 1. Clone the repository.
-2. Ensure you have your API Key configured in your environment variables.
-3. Run `python chatbot.py` from your terminal or PyCharm.
+2. Install dependencies: `pip install streamlit langchain pypdf2 faiss-cpu openai`
+3. Add your OpenAI API key to your local environment/Streamlit secrets.
+4. Run the app: `streamlit run chatbot.py`
