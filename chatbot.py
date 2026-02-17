@@ -1,59 +1,99 @@
 import streamlit as st
-from PyPDF2 import PdfReader
-from gitdb.fun import chunk_size
-from langchain.chains.qa_with_sources.map_reduce_prompt import question_prompt_template
+from pypdf import PdfReader  # Safer than PyPDF2
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chains.question_answering import load_qa_chain
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
+# Access secret safely
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
+st.set_page_config(page_title="Document Chatbot", layout="wide")
+st.header("Document Intelligence Chatbot")
 
-
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]  # Use Streamlit secrets for safety
-
-st.header("Chatbot")
-
-with st.sidebar:
-    st.title("Your documents")
-    file = st.file_uploader("Upload your documents", type="pdf")
-
-
-if file is not None:
-    pdf_reader = PdfReader (file)
+# Cache document processing (fixed for uploaded bytes)
+@st.cache_resource
+def process_file(_file_bytes):
+    """Process PDF into vector store with validation."""
+    if not _file_bytes.startswith(b'%PDF-'):  # Basic PDF magic bytes check
+        st.error("Invalid PDF file.")
+        st.stop()
+    
+    pdf_reader = PdfReader(_file_bytes)
     text = ""
     for page in pdf_reader.pages:
-        text+=page.extract_text()
-        #st.write(text)
-
+        content = page.extract_text()
+        if content:
+            text += content + "\n"
+    
     text_splitter = RecursiveCharacterTextSplitter(
-        separators="\n",
+        separators=["\n\n", "\n", ". "],  # Fixed separators (no double \\)
         chunk_size=1000,
         chunk_overlap=150,
         length_function=len
     )
     chunks = text_splitter.split_text(text)
-    st.write(chunks)
-
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-
+    
+    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
     vector_store = FAISS.from_texts(chunks, embeddings)
+    return vector_store
 
-    user_question = st.text_input("Type your question here")
+# Sidebar
+with st.sidebar:
+    st.title("Your Documents")
+    file = st.file_uploader("Upload PDF documents", type="pdf", key="pdf_upload")
 
+# Main logic with session state
+if file is not None:
+    with st.spinner("Processing document..."):
+        # Convert file to bytes for caching (key issue in original)
+        file_bytes = file.read()
+        vector_store = process_file(file_bytes)
+    
+    st.success(f"Processed document into {vector_store.index.ntotal} chunks.")
+    
+    # Chat interface
+    user_question = st.text_input("Ask a question about your document:", key="question")
+    
     if user_question:
-        match = vector_store.similarity_search(user_question)
-        #st.write(match)
+        with st.spinner("Generating answer..."):
+            # Similarity search
+            docs = vector_store.similarity_search(user_question, k=4)
+            
+            # Modern LLM (updated model)
+            llm = ChatOpenAI(
+                api_key=OPENAI_API_KEY,
+                model="gpt-4o-mini",  # More efficient than gpt-3.5-turbo
+                temperature=0,
+                max_tokens=1500
+            )
+            
+            # Modern chain (load_qa_chain is deprecated)
+            prompt = ChatPromptTemplate.from_template("""
+            Use ONLY the following context to answer the question. 
+            If the answer isn't in the context, say, "I don't have enough information."
+            
+            Context: {context}
+            
+            Question: {question}
+            
+            Answer: """)
+            
+            chain = create_stuff_documents_chain(llm, prompt)
+            response = chain.invoke({
+                "context": docs, 
+                "question": user_question
+            })
+        
+        st.markdown("### Answer")
+        st.write(response["answer"])
+        
+        # Sources expander
+        with st.expander("View Sources", expanded=False):
+            for i, doc in enumerate(docs):
+                st.markdown(f"**Source {i+1}:**")
+                st.write(doc.page_content[:400] + "..." if len(doc.page_content) > 400 else doc.page_content)
+else:
+    st.info("Please upload a PDF document in the sidebar to get started.")
 
-        llm = ChatOpenAI(
-            openai_api_key=OPENAI_API_KEY,
-            temperature = 0,
-            max_tokens = 1000,
-            model_name = "gpt-3.5-turbo"
-        )
-
-        #chain -> take_the_question, get_relevant_document, pass it to me LLM, generate
-        chain = load_qa_chain(llm, chain_type="stuff")
-        response = chain.run(input_documents = match, question = user_question)
-        st.write(response)
