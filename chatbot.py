@@ -22,10 +22,10 @@ def process_file(_file_bytes):
     for page in pdf_reader.pages:
         content = page.extract_text()
         if content:
-            text += content + "\n"  # FIXED
+            text += content + "\n"  
     
     text_splitter = RecursiveCharacterTextSplitter(
-        separators=["\n\n", "\n", ". "],  # FIXED
+        separators=["\n\n", "\n", ". "],  
         chunk_size=1000,
         chunk_overlap=150,
         length_function=len
