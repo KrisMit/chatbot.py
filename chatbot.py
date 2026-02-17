@@ -1,22 +1,19 @@
 import streamlit as st
-from pypdf import PdfReader  # Safer than PyPDF2
+from pypdf import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
-# Access secret safely
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="Document Chatbot", layout="wide")
 st.header("Document Intelligence Chatbot")
 
-# Cache document processing (fixed for uploaded bytes)
 @st.cache_resource
 def process_file(_file_bytes):
-    """Process PDF into vector store with validation."""
-    if not _file_bytes.startswith(b'%PDF-'):  # Basic PDF magic bytes check
+    if not _file_bytes.startswith(b'%PDF-'):
         st.error("Invalid PDF file.")
         st.stop()
     
@@ -25,10 +22,10 @@ def process_file(_file_bytes):
     for page in pdf_reader.pages:
         content = page.extract_text()
         if content:
-            text += content + "\n"
+            text += content + "\n"  # FIXED
     
     text_splitter = RecursiveCharacterTextSplitter(
-        separators=["\n\n", "\n", ". "],  # Fixed separators (no double \\)
+        separators=["\n\n", "\n", ". "],  # FIXED
         chunk_size=1000,
         chunk_overlap=150,
         length_function=len
@@ -39,40 +36,37 @@ def process_file(_file_bytes):
     vector_store = FAISS.from_texts(chunks, embeddings)
     return vector_store
 
-# Sidebar
+# Session state for persistence
+if "vector_store" not in st.session_state:
+    st.session_state.vector_store = None
+
 with st.sidebar:
     st.title("Your Documents")
-    file = st.file_uploader("Upload PDF documents", type="pdf", key="pdf_upload")
+    file = st.file_uploader("Upload PDF", type="pdf")
 
-# Main logic with session state
 if file is not None:
-    with st.spinner("Processing document..."):
-        # Convert file to bytes for caching (key issue in original)
+    with st.spinner("Processing..."):
         file_bytes = file.read()
-        vector_store = process_file(file_bytes)
+        st.session_state.vector_store = process_file(file_bytes)
     
-    st.success(f"Processed document into {vector_store.index.ntotal} chunks.")
+    st.success(f"Loaded {st.session_state.vector_store.index.ntotal} chunks")
     
-    # Chat interface
-    user_question = st.text_input("Ask a question about your document:", key="question")
+    user_question = st.text_input("Ask about the document:", key="question")
     
-    if user_question:
-        with st.spinner("Generating answer..."):
-            # Similarity search
-            docs = vector_store.similarity_search(user_question, k=4)
+    if user_question and st.session_state.vector_store:
+        with st.spinner("Answering..."):
+            docs = st.session_state.vector_store.similarity_search(user_question, k=4)
             
-            # Modern LLM (updated model)
             llm = ChatOpenAI(
                 api_key=OPENAI_API_KEY,
-                model="gpt-4o-mini",  # More efficient than gpt-3.5-turbo
+                model="gpt-4o-mini",
                 temperature=0,
                 max_tokens=1500
             )
             
-            # Modern chain (load_qa_chain is deprecated)
             prompt = ChatPromptTemplate.from_template("""
             Use ONLY the following context to answer the question. 
-            If the answer isn't in the context, say, "I don't have enough information."
+            If the answer isn't in the context, say "I don't have enough information."
             
             Context: {context}
             
@@ -81,19 +75,16 @@ if file is not None:
             Answer: """)
             
             chain = create_stuff_documents_chain(llm, prompt)
-            response = chain.invoke({
-                "context": docs, 
-                "question": user_question
-            })
+            response = chain.invoke({"context": docs, "question": user_question})
         
         st.markdown("### Answer")
         st.write(response["answer"])
         
-        # Sources expander
-        with st.expander("View Sources", expanded=False):
+        with st.expander("Sources"):
             for i, doc in enumerate(docs):
                 st.markdown(f"**Source {i+1}:**")
                 st.write(doc.page_content[:400] + "..." if len(doc.page_content) > 400 else doc.page_content)
 else:
-    st.info("Please upload a PDF document in the sidebar to get started.")
+    st.info("Upload a PDF to start")
+
 
