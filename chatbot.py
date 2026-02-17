@@ -11,7 +11,7 @@ from langchain_community.chat_models import ChatOpenAI
 
 
 
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]  # Use Streamlit secrets for safety
 
 st.header("Chatbot")
 
